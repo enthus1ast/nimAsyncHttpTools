@@ -116,7 +116,7 @@ proc renderNotFound(): string = tmpli """
   404 not found
 """
 
-proc newSimpleHttpServer(listeningAddress = "0.0.0.0", port = 8080, base = getAppDir()): SimpleHTTPServer =
+proc newSimpleHttpServer(listeningAddress = "0.0.0.0", port = 8080, base = getCurrentDir()): SimpleHTTPServer =
   result = SimpleHTTPServer()
   result.httpServer = newAsyncHttpServer()
   result.base = base
