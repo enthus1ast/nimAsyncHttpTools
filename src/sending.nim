@@ -63,15 +63,19 @@ proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsa
       # ("Content-Length", $fileSize),
       ("Accept-Ranges", "bytes")
       ])
-    echo "serving static file: '${path}'" % ["path", path]
-    echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
-    let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
-    headers["content-length"] = $(rng.len)
-    headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize] 
-    # await req.respond(Http200, $readFile(path), headers = headers) 
-    echo $rng
-    echo $(rng.len)
-    await req.respond(Http206, $readRange(path, rng), headers = headers)  
+    # echo "serving static file: '${path}'" % ["path", path]
+
+    if req.headers.hasKey("range"):
+      echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
+      let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
+      headers["content-length"] = $(rng.len)
+      headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize] 
+      # # await req.respond(Http200, $readFile(path), headers = headers) 
+      # echo $rng
+      # echo $(rng.len)
+      await req.respond(Http206, $readRange(path, rng), headers = headers)  
+    else:
+      await req.respond(Http200, $readFile(path), headers = headers) 
     # await req.respond(Http200, $readRange(path, rng), headers = headers)  
     return true
   else:
