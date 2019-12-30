@@ -90,7 +90,7 @@ proc renderPath(base, path: string): string = tmpli """
         <tr>
 
           <td>
-            <a href="/$(file.path.trimBase(base))">
+            <a href="$(file.path.trimBase(base))">
               ${let strippedPath = file.path.trimBase(base).extractFilename()}
               $if file.fileInfo.kind == pcFile {
                 $(strippedPath)
@@ -125,7 +125,8 @@ proc newSimpleHttpServer(listeningAddress = "0.0.0.0", port = 8080, base = getCu
 
 proc cb(srv: SimpleHTTPServer, req: Request) {.async.} =
   let path = (srv.base / req.url.path).decodeUrl()
-  # echo path
+  echo "BASE:", srv.base
+  echo "PATH:", path
   info "${path}" % ["path", path]
   if path.fileExists:
     # echo "FILE"
