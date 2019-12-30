@@ -22,9 +22,10 @@
 ## $ simplehttpserver
 ## ```
 import asynchttpserver, asyncdispatch
-import os, strutils, uri
+import os, strutils, uri, logging
 import sending
 import templates
+import psutil
 
 type 
   MyFileInfo = object
@@ -33,6 +34,7 @@ type
   SimpleHttpServer = object
     base: string
     httpServer: AsyncHttpServer
+    listeningAddress: string
     port: Port
 
 proc fileInfos(path: string): seq[MyFileInfo] = 
@@ -114,20 +116,22 @@ proc renderNotFound(): string = tmpli """
   404 not found
 """
 
-proc newSimpleHttpServer(base: string = getAppDir()): SimpleHTTPServer =
+proc newSimpleHttpServer(listeningAddress = "0.0.0.0", port = 8080, base = getAppDir()): SimpleHTTPServer =
   result = SimpleHTTPServer()
   result.httpServer = newAsyncHttpServer()
   result.base = base
-  result.port = 8080.Port
+  result.port = port.Port
+  result.listeningAddress = listeningAddress
 
 proc cb(srv: SimpleHTTPServer, req: Request) {.async.} =
   let path = (srv.base / req.url.path).decodeUrl()
-  echo path
+  # echo path
+  info "${path}" % ["path", path]
   if path.fileExists:
-    echo "FILE"
+    # echo "FILE"
     discard await req.sendStaticIfExists(path)
   elif path.dirExists:
-    echo "DIR"
+    # echo "DIR"
     await req.respond(Http200, renderPath(srv.base, req.url.path))
   else:
     await req.respond(Http404, renderNotFound())
@@ -151,9 +155,27 @@ proc cli(srv: var SimpleHTTPServer) =
       quit()
     srv.base = paramStr(1)
 
+proc formatLine(address: string, port: Port): string =
+  return "-> http://${ip}:${port}" % ["ip", address, "port", $port.int]
+
+proc echoListening(srv: SimpleHTTPServer) =
+  echo "SimpleHTTPServer listening on: "
+  if srv.listeningAddress == "0.0.0.0":
+    for ifname, addresses in net_if_addrs():
+      echo ""
+      echo ifname & ":"
+      for address in addresses:
+        echo formatLine(address.address, srv.port)
+  else:
+    echo formatLine(srv.listeningAddress, srv.port)
+  echo ""
+
 when isMainModule:
+  var consoleLog = newConsoleLogger(fmtStr="[$date $time] ")
+  addHandler(consoleLog)
   var simpleHttpServer = newSimpleHttpServer()
   simpleHttpServer.cli()
+  simpleHttpServer.echoListening()
   waitFor simpleHttpServer.serve()
 
 
