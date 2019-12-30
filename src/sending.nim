@@ -10,6 +10,18 @@ type
 
 let mime = newMimetypes() 
 
+proc redirect(req: Request, code: HttpCode, path: string) {.async.} =
+  let headers = newHttpHeaders([("location", path)])
+  await req.respond(code, "", headers)
+
+proc redirectPerm*(req: Request, path: string) {.async.} = 
+  ## redirects the browser to the given url in path
+  await req.redirect(Http301, path)
+
+proc redirectTemp*(req: Request, path: string) {.async.} = 
+  ## redirects the browser to the given url in path
+  await req.redirect(Http302, path)
+
 proc len(range: Range): int =
   return (range.b+1) - range.a
 
