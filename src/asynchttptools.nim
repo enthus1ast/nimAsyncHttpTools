@@ -16,3 +16,7 @@ export cookie
 ## For working with queries
 import ./queries
 export queries
+
+## Some convenient tools
+import ./utils
+export utils

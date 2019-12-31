@@ -22,10 +22,11 @@ proc redirectTemp*(req: Request, path: string) {.async.} =
   ## redirects the browser to the given url in path
   await req.redirect(Http302, path)
 
-proc len(range: Range): int =
+proc len*(range: Range): int =
+  ## returns the amount of a bytes a byte range has
   return (range.b+1) - range.a
 
-proc computeRange(byteCount: int, rangeSyntax: string): Range =
+proc computeRange*(byteCount: int, rangeSyntax: string): Range =
   if not rangeSyntax.contains("-"):
     # Invalid byte range syntax!
     return (0, byteCount-1)
@@ -41,22 +42,15 @@ proc computeRange(byteCount: int, rangeSyntax: string): Range =
 
   return (parts[0].parseInt(), parts[1].parseInt())
 
-proc readRange(file: File, rng: Range): string =
-  # var buf = alloc(rng.len)
+proc readRange*(file: File, rng: Range): string =
   file.setFilePos(rng.a)
   var buf: seq[char] = @[]
   buf.setLen(rng.len)
   let byteCnt = file.readChars(buf, 0, rng.len)
   result = cast[string](buf)
   result.setLen(byteCnt)
-  # let byteCnt = file.readBuffer(buf, rng.len)
-  # result = (cast[string](buf))
-  # echo result
 
-  # result.setLen(byteCnt)
-  # dealloc(buf)
-
-proc readRange(path: string, rng: Range): string =
+proc readRange*(path: string, rng: Range): string =
   var file = open(path, fmRead)
   result = file.readRange(rng)
   file.close()
@@ -75,64 +69,17 @@ proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsa
       # ("Content-Length", $fileSize),
       ("Accept-Ranges", "bytes")
       ])
-    # echo "serving static file: '${path}'" % ["path", path]
-
     if req.headers.hasKey("range"):
       echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
       let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
       headers["content-length"] = $(rng.len)
       headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize] 
-      # # await req.respond(Http200, $readFile(path), headers = headers) 
-      # echo $rng
-      # echo $(rng.len)
       await req.respond(Http206, $readRange(path, rng), headers = headers)  
     else:
       await req.respond(Http200, $readFile(path), headers = headers) 
-    # await req.respond(Http200, $readRange(path, rng), headers = headers)  
     return true
   else:
     return false
-
-###################################################
-# TESTS
-###################################################
-when isMainModule:
-
-  import unittest
-  test "content length":
-    check computeRange(2000, "0-1023").len == 1024
-    check computeRange(2000, "0-50").len == 51
-    check computeRange(2000, "1-50").len == 50
-    check computeRange(2000, "-50").len == 50
-    check computeRange(1256, "50-").len == 1206
-
-  suite "reading":
-    setup:
-      let testpath = "tests/data1.txt" 
-      let data1size = getFileSize(testpath).int
-    test "test read":
-      let testRange = computeRange(data1size, "0-4")
-      check readRange(testpath, testRange).len() == testRange.len()
-      check readRange(testpath, testRange) == "AAAAA"
-    test "test read not a == 0":
-      let testRange = computeRange(data1size, "1-5")
-      check readRange(testpath, testRange).len() == testRange.len()
-      check readRange(testpath, testRange) == "AAAAB"
-    test "test read last 5 bytes":
-      let testRange = computeRange(data1size, "-5")
-      check testRange.len == 5
-      check readRange(testpath, testRange).len() == testRange.len()
-      check readRange(testpath, testRange) == "CCCCC"  
-    test "test read last 1 byte":
-      let testRange = computeRange(data1size, "-1")
-      check testRange.len == 1
-      check readRange(testpath, testRange).len() == testRange.len()
-      check readRange(testpath, testRange) == "C"  
-    # test "test read last 1 byte":
-    #   let testRange = computeRange(data1size, "-1")
-    #   check testRange.len == 1
-    #   check readRange(testpath, testRange).len() == testRange.len()
-    #   check readRange(testpath, testRange) == "C"  
 
 
   ###################################################

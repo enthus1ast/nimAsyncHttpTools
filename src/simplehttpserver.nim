@@ -23,9 +23,8 @@
 ## ```
 import asynchttpserver, asyncdispatch
 import os, strutils, uri, logging
-import sending
+import sending, utils
 import templates
-import psutil
 
 type 
   MyFileInfo = object
@@ -137,11 +136,10 @@ proc cb(srv: SimpleHTTPServer, req: Request) {.async.} =
   else:
     await req.respond(Http404, renderNotFound())
 
-proc serve(simpleHttpServer: SimpleHTTPServer): Future[void] {.async.} =
-  await simpleHttpServer.httpServer.serve(Port(8080), 
-    proc (req: Request): Future[void] = 
-      cb(simpleHttpServer, req)
-  )
+proc serve(srv: SimpleHTTPServer): Future[void] {.async.} =
+  proc scb(req: Request): Future[void] = 
+    cb(srv, req)
+  await srv.httpServer.serve(Port(srv.port), scb, srv.listeningAddress)
 
 const help = """
   simplehttpserver -h
@@ -156,21 +154,9 @@ proc cli(srv: var SimpleHTTPServer) =
       quit()
     srv.base = paramStr(1)
 
-proc formatLine(address: string, port: Port): string =
-  return "-> http://${ip}:${port}" % ["ip", address, "port", $port.int]
-
 proc echoListening(srv: SimpleHTTPServer) =
-  echo "SimpleHTTPServer listening on: "
-  if srv.listeningAddress == "0.0.0.0":
-    for ifname, addresses in net_if_addrs():
-      echo ""
-      echo ifname & ":"
-      for address in addresses:
-        echo formatLine(address.address, srv.port)
-  else:
-    echo formatLine(srv.listeningAddress, srv.port)
-  echo ""
-
+  echo genListening(srv.listeningAddress, srv.port)
+  
 when isMainModule:
   var consoleLog = newConsoleLogger(fmtStr="[$date $time] ")
   addHandler(consoleLog)
