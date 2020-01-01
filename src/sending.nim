@@ -10,17 +10,17 @@ type
 
 let mime = newMimetypes() 
 
-proc redirect(req: Request, code: HttpCode, path: string) {.async.} =
-  let headers = newHttpHeaders([("location", path)])
+proc redirect(req: Request, code: HttpCode, path: string, headers = newHttpHeaders()) {.async.} =
+  headers["location"] = path
   await req.respond(code, "", headers)
 
-proc redirectPerm*(req: Request, path: string) {.async.} = 
+proc redirectPerm*(req: Request, path: string, headers = newHttpHeaders()) {.async.} = 
   ## redirects the browser to the given url in path
-  await req.redirect(Http301, path)
+  await req.redirect(Http301, path, headers)
 
-proc redirectTemp*(req: Request, path: string) {.async.} = 
+proc redirectTemp*(req: Request, path: string, headers = newHttpHeaders()) {.async.} = 
   ## redirects the browser to the given url in path
-  await req.redirect(Http302, path)
+  await req.redirect(Http302, path, headers)
 
 proc len*(range: Range): int =
   ## returns the amount of a bytes a byte range has
@@ -43,6 +43,7 @@ proc computeRange*(byteCount: int, rangeSyntax: string): Range =
   return (parts[0].parseInt(), parts[1].parseInt())
 
 proc readRange*(file: File, rng: Range): string =
+  ## reads from a file with the given Range
   file.setFilePos(rng.a)
   var buf: seq[char] = @[]
   buf.setLen(rng.len)
@@ -51,6 +52,7 @@ proc readRange*(file: File, rng: Range): string =
   result.setLen(byteCnt)
 
 proc readRange*(path: string, rng: Range): string =
+  ## reads from a path with the given Range
   var file = open(path, fmRead)
   result = file.readRange(rng)
   file.close()
