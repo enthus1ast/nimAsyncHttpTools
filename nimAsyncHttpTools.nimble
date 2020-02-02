@@ -1,12 +1,12 @@
 # Package
 
-version       = "0.1.6"
+version       = "0.1.7"
 author        = "David Krause"
 description   = "Small tools for stdlib asynchttpserver"
 license       = "MIT"
 srcDir        = "src"
 installExt = @["nim"]
-bin = @["simplehttpserver"]
+# bin = @["simplehttpserver"] # Causes file already exists error when using as dependency in other projects
 
 
 # Dependencies
