@@ -2,23 +2,25 @@ import asyncdispatch, asynchttpserver, os, md5, asyncfile
 import mimetypes
 import logging
 import strutils
+import asyncfile
+import asyncnet
 
-type 
+type
   Range = tuple
     a: int
     b: int
 
-let mime = newMimetypes() 
+let mime = newMimetypes()
 
 proc redirect(req: Request, code: HttpCode, path: string, headers = newHttpHeaders()) {.async.} =
   headers["location"] = path
   await req.respond(code, "", headers)
 
-proc redirectPerm*(req: Request, path: string, headers = newHttpHeaders()) {.async.} = 
+proc redirectPerm*(req: Request, path: string, headers = newHttpHeaders()) {.async.} =
   ## redirects the browser to the given url in path
   await req.redirect(Http301, path, headers)
 
-proc redirectTemp*(req: Request, path: string, headers = newHttpHeaders()) {.async.} = 
+proc redirectTemp*(req: Request, path: string, headers = newHttpHeaders()) {.async.} =
   ## redirects the browser to the given url in path
   await req.redirect(Http302, path, headers)
 
@@ -31,11 +33,11 @@ proc computeRange*(byteCount: int, rangeSyntax: string): Range =
     # Invalid byte range syntax!
     return (0, byteCount-1)
   let parts = rangeSyntax.split("-")
-  
+
   # the last `b` bytes
   if parts[0] == "":
     return (byteCount-(parts[1]).parseInt(), byteCount-1)
-  
+
   # from `a` to end
   if parts[1] == "":
     return (parts[0].parseInt(), byteCount-1)
@@ -60,7 +62,7 @@ proc readRange*(path: string, rng: Range): string =
 proc extractRangeFromHeader(str: string): string =
   str.replace("bytes=", "")
 
-proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsafe.} = 
+proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsafe.} =
   # TODO serve static files like jester
   # TODO serve byte ranges
   if fileExists(path):
@@ -75,10 +77,17 @@ proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsa
       echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
       let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
       headers["content-length"] = $(rng.len)
-      headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize] 
-      await req.respond(Http206, $readRange(path, rng), headers = headers)  
+      headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize]
+      await req.respond(Http206, $readRange(path, rng), headers = headers)
     else:
-      await req.respond(Http200, $readFile(path), headers = headers) 
+      let file = openAsync(path, fmRead)
+      let cont = await readAll(file)
+      if req.client.isClosed():
+        echo "ERROR SOCKET CLOSED 0000000000000"
+        return true
+      await req.respond(Http200, cont, headers = headers)
+      req.client.close()
+
     return true
   else:
     return false
@@ -101,19 +110,19 @@ proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsa
   #         header('Content-Range: bytes */' . filelength); // Required in 416.
   #         exit;
   #     }
-  
+
   #     $ranges = explode(',', substr($_SERVER['HTTP_RANGE'], 6));
   #     foreach ($ranges as $range) {
   #         $parts = explode('-', $range);
   #         $start = $parts[0]; // If this is empty, this should be 0.
   #         $end = $parts[1]; // If this is empty or greater than than filelength - 1, this should be filelength - 1.
-  
+
   #         if ($start > $end) {
   #             header('HTTP/1.1 416 Requested Range Not Satisfiable');
   #             header('Content-Range: bytes */' . filelength); // Required in 416.
   #             exit;
   #         }
-  
+
   #         // ...
   #     }
   # }

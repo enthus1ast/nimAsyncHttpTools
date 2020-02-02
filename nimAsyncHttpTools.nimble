@@ -11,7 +11,7 @@ bin = @["simplehttpserver"]
 
 # Dependencies
 
-requires "nim >= 1.0.9"
+requires "nim >= 1.0.4"
 requires "https://github.com/johnscillieri/psutil-nim.git"
 requires "https://github.com/onionhammer/nim-templates.git"
 
