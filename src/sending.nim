@@ -82,6 +82,7 @@ proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsa
     else:
       let file = openAsync(path, fmRead)
       let cont = await readAll(file)
+      file.close()
       if req.client.isClosed():
         echo "ERROR SOCKET CLOSED 0000000000000"
         return true
