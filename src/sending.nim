@@ -82,6 +82,7 @@ proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsa
     else:
       let file = openAsync(path, fmRead)
       let cont = await readAll(file)
+      file.close()
       if req.client.isClosed():
         return true
       await req.respond(Http200, cont, headers = headers)
