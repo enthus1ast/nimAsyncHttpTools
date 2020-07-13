@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.6"
+version       = "0.1.7"
 author        = "David Krause"
 description   = "Small tools for stdlib asynchttpserver"
 license       = "MIT"
@@ -12,6 +12,5 @@ bin = @["simplehttpserver"]
 # Dependencies
 
 requires "nim >= 1.0.4"
-requires "https://github.com/johnscillieri/psutil-nim.git"
+requires "psutil >= 0.6.0"
 requires "https://github.com/onionhammer/nim-templates.git"
-
