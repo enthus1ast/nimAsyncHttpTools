@@ -6,7 +6,7 @@ description   = "Small tools for stdlib asynchttpserver"
 license       = "MIT"
 srcDir        = "src"
 installExt = @["nim"]
-# bin = @["simplehttpserver"] # Causes file already exists error when using as dependency in other projects
+bin = @["simplehttpserver"] # Causes file already exists error when using as dependency in other projects
 
 # Dependencies
 requires "nim >= 1.4.8"

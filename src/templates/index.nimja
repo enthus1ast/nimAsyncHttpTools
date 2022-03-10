@@ -1,0 +1,40 @@
+{% extends "templates/partials/_master.nimja" %}
+{% block content %}
+<h1>Directory listing for: {{path}}</h1>
+<table width=100%>
+
+  <tr>
+    <th>Name</th>
+    <th>Size</th>
+  </tr>
+
+  <tr>
+    <td>
+      <a href="..">..</a>
+    </td>
+    <td></td>
+  </tr>
+
+  {% for file in fileInfos(base / path) %}
+    <tr>
+
+      <td>
+        <a href="{{ file.path.trimBase(base) }}">
+          {% let strippedPath = file.path.trimBase(base).extractFilename() %}
+            {% if file.fileInfo.kind == pcFile %}
+              {{strippedPath}}
+            {% else %}
+              {{strippedPath}}/
+            {% endif %}
+          </a>
+        </td>
+
+        <td>
+          {{ file.fileInfo.size.formatSize(includeSpace = true, prefix = bpColloquial) }}
+        </td>
+
+      </tr>
+  {% endfor %}
+
+  </table>
+{% endblock %}

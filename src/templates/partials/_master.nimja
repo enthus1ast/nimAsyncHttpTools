@@ -1,0 +1,21 @@
+<html>
+  <header>
+    <title>{{path}}</title>
+    <style>
+      table {
+        border-collapse: collapse;
+      }
+      th {
+        border-bottom: 2px solid black;
+      }
+      tr {
+        border: 1px solid black;
+      }
+      tr:nth-child(even) {background: #CCC}
+      tr:nth-child(odd) {background: #FFF}
+    </style>
+  </header>
+  <body>
+    {% block content %}{% endblock %}
+  </body>
+</html>

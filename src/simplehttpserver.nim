@@ -48,69 +48,8 @@ proc fileInfos(path: string): seq[MyFileInfo] =
 proc trimBase(path, base: string): string =
   path[base.len..^1]
 
-# proc format(str: string): string =
-#   var parts = split(" ")
-
 proc renderPath(base, path: string): string =
-  compileTemplateStr("""
-<html>
-  <header>
-    <title>{{path}}</title>
-    <style>
-      table {
-        border-collapse: collapse;
-      }
-      th {
-        border-bottom: 2px solid black;
-      }
-      tr {
-        border: 1px solid black;
-      }
-      tr:nth-child(even) {background: #CCC}
-      tr:nth-child(odd) {background: #FFF}
-    </style>
-  </header>
-  <body>
-    <h1>Directory listing for: {{path}}</h1>
-    <table width=100%>
-
-      <tr>
-        <th>Name</th>
-        <th>Size</th>
-      </tr>
-
-      <tr>
-        <td>
-          <a href="..">..</a>
-        </td>
-        <td></td>
-      </tr>
-
-      {% for file in fileInfos(base / path) %}
-        <tr>
-
-          <td>
-            <a href="{{ file.path.trimBase(base) }}">
-              {% let strippedPath = file.path.trimBase(base).extractFilename() %}
-              {% if file.fileInfo.kind == pcFile %}
-                {{strippedPath}}
-              {% else %}
-                {{strippedPath}}/
-              {% endif %}
-            </a>
-          </td>
-
-          <td>
-            {{ file.fileInfo.size.formatSize(includeSpace = true, prefix = bpColloquial) }}
-          </td>
-
-        </tr>
-      {% endfor %}
-
-    </table>
-  </body>
-</html>
-""")
+  compileTemplateFile(getScriptDir() / "templates/index.nimja")
 
 proc renderNotFound(): string = return """
   404 not found
@@ -129,10 +68,8 @@ proc cb(srv: SimpleHTTPServer, req: Request) {.async.} =
   echo "PATH:", path
   info "${path}" % ["path", path]
   if path.fileExists:
-    # echo "FILE"
     discard await req.sendStaticIfExists(path)
   elif path.dirExists:
-    # echo "DIR"
     await req.respond(Http200, renderPath(srv.base, req.url.path))
   else:
     await req.respond(Http404, renderNotFound())
