@@ -65,156 +65,34 @@ proc extractRangeFromHeader(str: string): string =
 proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsafe.} =
   # TODO serve static files like jester
   # TODO serve byte ranges
-  const BUFSIZE = 1024 * 5
   if fileExists(path):
     let fileSize = getFileSize(path)
     let mimetype = mime.getMimeType(splitFile(path).ext)
-
-    var buf = alloc0(BUFSIZE)
-    var file = openAsync(path, fmRead)
-
     var headers = newHttpHeaders([
       ("Content-Type", mimetype),
-      ("Content-Length", $fileSize),
-      # ("Content-Length", $15),
-      ("Accept-Ranges", "bytes"),
-      ("Connection", "close")
+      # ("Content-Length", $fileSize),
+      ("Accept-Ranges", "bytes")
       ])
-
-    await req.respond(Http200, "", headers = headers)
-    # await req.sendHeaders(headers)
-
-    var msg = newString(BUFSIZE)
-    while true:
-      var cnt = await readBuffer(file, buf, BUFSIZE)
-      if cnt == 0: break
-      moveMem(addr msg[0], buf, cnt)
-      msg.setLen(cnt)
-      if req.client.isClosed:
-        echo "CLIENT GONE"
-        break
-      await req.client.send(msg)
-
-    file.close()
-    dealloc(buf)
-    # await req.close()
-
-
-    # if req.headers.hasKey("range"):
-    #   echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
-    #   let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
-    #   headers["content-length"] = $(rng.len)
-    #   headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize]
-
-    #   await req.respond(Http206, "", headers = headers)
-    #   # $readRange(path, rng)
-    #   var file = open(path, fmRead)
-    #   file.setFilePos(rng.a)
-    #   for
-
-    # else:
-    #   let file = openAsync(path, fmRead)
-    #   let cont = await readAll(file)
-    #   file.close()
-    #   if req.client.isClosed():
-    #     echo "ERROR SOCKET CLOSED 0000000000000"
-    #     return true
-    #   await req.respond(Http200, cont, headers = headers)
-    #   req.client.close()
+    if req.headers.hasKey("range"):
+      echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
+      let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
+      headers["content-length"] = $(rng.len)
+      headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize]
+      await req.respond(Http206, $readRange(path, rng), headers = headers)
+    else:
+      let file = openAsync(path, fmRead)
+      var cont: string
+      try:
+        cont = await readAll(file)
+      except:
+        echo "warn could not read from file:", path
+        return
+      file.close()
+      if req.client.isClosed():
+        return true
+      await req.respond(Http200, cont, headers = headers)
+      # req.client.close() # warning, this breaks eg. ch4t. so remove?
 
     return true
   else:
     return false
-
-
-  ###################################################
-  # INFOS
-  ###################################################
-
-  # TODO byteranges!
-  # https://www.phpgangsta.de/http-range-request-header-in-php-parsen
-  # Range: bytes=0-500                 // Die ersten 500 Bytes
-  # Range: bytes=-500                  // Die letzten 500 Bytes (nicht 0-500!)
-  # Range: bytes=500-                  // Ab Byte 500 bis zum Ende
-  # Range: bytes=0-500,1000-1499,-200  // Die ersten 500 Bytes, von Byte 1000 bis 1499, und die letzten 200 Bytes
-
-  # if (isset($_SERVER['HTTP_RANGE'])) {
-  #     if (!preg_match('^bytes=\d*-\d*(,\d*-\d*)*$', $_SERVER['HTTP_RANGE'])) {
-  #         header('HTTP/1.1 416 Requested Range Not Satisfiable');
-  #         header('Content-Range: bytes */' . filelength); // Required in 416.
-  #         exit;
-  #     }
-
-  #     $ranges = explode(',', substr($_SERVER['HTTP_RANGE'], 6));
-  #     foreach ($ranges as $range) {
-  #         $parts = explode('-', $range);
-  #         $start = $parts[0]; // If this is empty, this should be 0.
-  #         $end = $parts[1]; // If this is empty or greater than than filelength - 1, this should be filelength - 1.
-
-  #         if ($start > $end) {
-  #             header('HTTP/1.1 416 Requested Range Not Satisfiable');
-  #             header('Content-Range: bytes */' . filelength); // Required in 416.
-  #             exit;
-  #         }
-
-  #         // ...
-  #     }
-  # }
-
-
-
-  # proc sendStaticIfExists(
-  #   req: Request, paths: seq[string]
-  # ): Future[HttpCode] {.async.} =
-  #   result = Http200
-
-    # for p in paths:
-    #   if existsFile(p):
-
-    #     var fp = getFilePermissions(p)
-    #     if not fp.contains(fpOthersRead):
-    #       return Http403
-
-    #     let fileSize = getFileSize(p)
-    #     # let mimetype = req.settings.mimes.getMimetype(p.splitFile.ext[1 .. ^1])
-    #     let mimetype = "application/text"
-    #     if fileSize < 10_000_000: # 10 mb
-    #       var file = readFile(p)
-
-    #       var hashed = getMD5(file)
-
-    #       # # If the user has a cached version of this file and it matches our
-    #       # # version, let them use it
-    #       # if req.headers.hasKey("If-None-Match") and req.headers["If-None-Match"] == hashed:
-    #       #   req.statusContent(Http304, "", none[RawHeaders]())
-    #       # else:
-    #       #   req.statusContent(Http200, file, some(@({
-    #       #                       "Content-Type": mimetype,
-    #       #                       "ETag": hashed
-    #       #                     })))
-    #     else:
-    #       let headers = @({
-    #         "Content-Type": mimetype,
-    #         "Content-Length": $fileSize
-    #       })
-    #       # req.statusContent(Http200, "", some(headers))
-
-    #       var fileStream = newFutureStream[string]("sendStaticIfExists")
-    #       var file = openAsync(p, fmRead)
-    #       # Let `readToStream` write file data into fileStream in the
-    #       # background.
-    #       asyncCheck file.readToStream(fileStream)
-    #       # The `writeFromStream` proc will complete once all the data in the
-    #       # `bodyStream` has been written to the file.
-    #       while true:
-    #         let (hasValue, value) = await fileStream.read()
-    #         if hasValue:
-    #           req.unsafeSend(value)
-    #         else:
-    #           break
-    #       file.close()
-
-    #     return
-
-    # # If we get to here then no match could be found.
-    # return Http404
