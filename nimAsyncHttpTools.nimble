@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.8"
+version       = "0.2.0"
 author        = "David Krause"
 description   = "Small tools for stdlib asynchttpserver"
 license       = "MIT"
@@ -11,7 +11,7 @@ installExt = @["nim"]
 
 # Dependencies
 
-requires "nim >= 1.0.4"
-requires "https://github.com/johnscillieri/psutil-nim.git"
-requires "https://github.com/onionhammer/nim-templates.git"
+requires "nim >= 1.4.8"
+requires "https://github.com/enthus1ast/nimLocalIp.git"
+requires "nimja"
 

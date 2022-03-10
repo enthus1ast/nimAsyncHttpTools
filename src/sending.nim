@@ -65,29 +65,62 @@ proc extractRangeFromHeader(str: string): string =
 proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsafe.} =
   # TODO serve static files like jester
   # TODO serve byte ranges
+  const BUFSIZE = 1024 * 5
   if fileExists(path):
     let fileSize = getFileSize(path)
     let mimetype = mime.getMimeType(splitFile(path).ext)
+
+    var buf = alloc0(BUFSIZE)
+    var file = openAsync(path, fmRead)
+
     var headers = newHttpHeaders([
       ("Content-Type", mimetype),
-      # ("Content-Length", $fileSize),
-      ("Accept-Ranges", "bytes")
+      ("Content-Length", $fileSize),
+      # ("Content-Length", $15),
+      ("Accept-Ranges", "bytes"),
+      ("Connection", "close")
       ])
-    if req.headers.hasKey("range"):
-      echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
-      let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
-      headers["content-length"] = $(rng.len)
-      headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize]
-      await req.respond(Http206, $readRange(path, rng), headers = headers)
-    else:
-      let file = openAsync(path, fmRead)
-      let cont = await readAll(file)
-      file.close()
-      if req.client.isClosed():
-        echo "ERROR SOCKET CLOSED 0000000000000"
-        return true
-      await req.respond(Http200, cont, headers = headers)
-      req.client.close()
+
+    await req.respond(Http200, "", headers = headers)
+    # await req.sendHeaders(headers)
+
+    var msg = newString(BUFSIZE)
+    while true:
+      var cnt = await readBuffer(file, buf, BUFSIZE)
+      if cnt == 0: break
+      moveMem(addr msg[0], buf, cnt)
+      msg.setLen(cnt)
+      if req.client.isClosed:
+        echo "CLIENT GONE"
+        break
+      await req.client.send(msg)
+
+    file.close()
+    dealloc(buf)
+    # await req.close()
+
+
+    # if req.headers.hasKey("range"):
+    #   echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
+    #   let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
+    #   headers["content-length"] = $(rng.len)
+    #   headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize]
+
+    #   await req.respond(Http206, "", headers = headers)
+    #   # $readRange(path, rng)
+    #   var file = open(path, fmRead)
+    #   file.setFilePos(rng.a)
+    #   for
+
+    # else:
+    #   let file = openAsync(path, fmRead)
+    #   let cont = await readAll(file)
+    #   file.close()
+    #   if req.client.isClosed():
+    #     echo "ERROR SOCKET CLOSED 0000000000000"
+    #     return true
+    #   await req.respond(Http200, cont, headers = headers)
+    #   req.client.close()
 
     return true
   else:

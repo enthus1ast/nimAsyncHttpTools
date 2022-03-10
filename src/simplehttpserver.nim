@@ -6,7 +6,7 @@
 ## -----------
 ## This is a simple http server for instant filesharing.
 ## Default behavior is to serves the current working dir.
-## `simplehttpserver` has implemented the http range syntax, 
+## `simplehttpserver` has implemented the http range syntax,
 ## so (unlike pythons http server) seeking in bigger files is supported!
 ## ```
 ##  like: python2 -m SimpleHTTPServer
@@ -14,7 +14,7 @@
 ##  like: http-server
 ## ```
 ##
-## 
+##
 ## Usage
 ## ------
 ## ```
@@ -24,9 +24,9 @@
 import asynchttpserver, asyncdispatch
 import os, strutils, uri, logging
 import sending, utils
-import templates
+import nimja
 
-type 
+type
   MyFileInfo = object
     path: string
     fileInfo: FileInfo
@@ -36,7 +36,7 @@ type
     listeningAddress: string
     port: Port
 
-proc fileInfos(path: string): seq[MyFileInfo] = 
+proc fileInfos(path: string): seq[MyFileInfo] =
   for kind, path in walkDir(path):
     var fileInfo = getFileInfo(path)
     let myFileInfo = MyFileInfo(
@@ -51,10 +51,11 @@ proc trimBase(path, base: string): string =
 # proc format(str: string): string =
 #   var parts = split(" ")
 
-proc renderPath(base, path: string): string = tmpli """
+proc renderPath(base, path: string): string =
+  compileTemplateStr("""
 <html>
   <header>
-    <title>$path</title>
+    <title>{{path}}</title>
     <style>
       table {
         border-collapse: collapse;
@@ -70,7 +71,7 @@ proc renderPath(base, path: string): string = tmpli """
     </style>
   </header>
   <body>
-    <h1>Directory listing for: $path</h1>
+    <h1>Directory listing for: {{path}}</h1>
     <table width=100%>
 
       <tr>
@@ -85,33 +86,33 @@ proc renderPath(base, path: string): string = tmpli """
         <td></td>
       </tr>
 
-      $for file in fileInfos(base / path) {
+      {% for file in fileInfos(base / path) %}
         <tr>
 
           <td>
-            <a href="$(file.path.trimBase(base))">
-              ${let strippedPath = file.path.trimBase(base).extractFilename()}
-              $if file.fileInfo.kind == pcFile {
-                $(strippedPath)
-              } $else {
-                $(strippedPath)/
-              }
+            <a href="{{ file.path.trimBase(base) }}">
+              {% let strippedPath = file.path.trimBase(base).extractFilename() %}
+              {% if file.fileInfo.kind == pcFile %}
+                {{strippedPath}}
+              {% else %}
+                {{strippedPath}}/
+              {% endif %}
             </a>
           </td>
 
           <td>
-            $(file.fileInfo.size.formatSize(includeSpace = true, prefix = bpColloquial))
+            {{ file.fileInfo.size.formatSize(includeSpace = true, prefix = bpColloquial) }}
           </td>
 
         </tr>
-      }
+      {% endfor %}
 
     </table>
   </body>
 </html>
-"""
+""")
 
-proc renderNotFound(): string = tmpli """
+proc renderNotFound(): string = return """
   404 not found
 """
 
@@ -137,7 +138,7 @@ proc cb(srv: SimpleHTTPServer, req: Request) {.async.} =
     await req.respond(Http404, renderNotFound())
 
 proc serve(srv: SimpleHTTPServer): Future[void] {.async.} =
-  proc scb(req: Request): Future[void] = 
+  proc scb(req: Request): Future[void] =
     cb(srv, req)
   await srv.httpServer.serve(Port(srv.port), scb, srv.listeningAddress)
 
@@ -156,7 +157,7 @@ proc cli(srv: var SimpleHTTPServer) =
 
 proc echoListening(srv: SimpleHTTPServer) =
   echo genListening(srv.listeningAddress, srv.port)
-  
+
 when isMainModule:
   var consoleLog = newConsoleLogger(fmtStr="[$date $time] ")
   addHandler(consoleLog)
@@ -164,5 +165,3 @@ when isMainModule:
   simpleHttpServer.cli()
   simpleHttpServer.echoListening()
   waitFor simpleHttpServer.serve()
-
-
