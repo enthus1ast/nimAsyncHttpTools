@@ -49,7 +49,7 @@ proc trimBase(path, base: string): string =
   path[base.len..^1]
 
 proc renderPath(base, path: string): string =
-  compileTemplateFile(getScriptDir() / "templates/index.nimja")
+  compileTemplateFile("templates/index.nimja", baseDir = getScriptDir())
 
 proc renderNotFound(): string = return """
   404 not found

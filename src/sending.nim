@@ -4,12 +4,16 @@ import logging
 import strutils
 import asyncfile
 import asyncnet
+import locks
+
 
 type
   Range = tuple
     a: int
     b: int
 
+
+var lock: Lock
 let mime = newMimetypes()
 
 proc redirect(req: Request, code: HttpCode, path: string, headers = newHttpHeaders()) {.async.} =
@@ -65,34 +69,36 @@ proc extractRangeFromHeader(str: string): string =
 proc sendStaticIfExists*(req: Request, path: string): Future[bool] {.async, gcsafe.} =
   # TODO serve static files like jester
   # TODO serve byte ranges
-  if fileExists(path):
-    let fileSize = getFileSize(path)
-    let mimetype = mime.getMimeType(splitFile(path).ext)
-    var headers = newHttpHeaders([
-      ("Content-Type", mimetype),
-      # ("Content-Length", $fileSize),
-      ("Accept-Ranges", "bytes")
-      ])
-    if req.headers.hasKey("range"):
-      echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
-      let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
-      headers["content-length"] = $(rng.len)
-      headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize]
-      await req.respond(Http206, $readRange(path, rng), headers = headers)
+  {.cast(gcsafe).}:
+    if fileExists(path):
+      let fileSize = getFileSize(path)
+      lock.acquire()
+      let mimetype = mime.getMimeType(splitFile(path).ext)
+      lock.release()
+      var headers = newHttpHeaders([
+        ("Content-Type", mimetype),
+        # ("Content-Length", $fileSize),
+        ("Accept-Ranges", "bytes")
+        ])
+      if req.headers.hasKey("range"):
+        echo $(req.headers.getOrDefault("range").extractRangeFromHeader)
+        let rng = computeRange(fileSize.int, $(req.headers.getOrDefault("range").extractRangeFromHeader()))
+        headers["content-length"] = $(rng.len)
+        headers["Content-Range"] = "bytes $#-$#/$#" % [$rng.a, $rng.b, $fileSize]
+        await req.respond(Http206, $readRange(path, rng), headers = headers)
+      else:
+        let file = openAsync(path, fmRead)
+        var cont: string
+        try:
+          cont = await readAll(file)
+        except:
+          echo "warn could not read from file:", path
+          return
+        file.close()
+        if req.client.isClosed():
+          return true
+        await req.respond(Http200, cont, headers = headers)
+        # req.client.close() # warning, this breaks eg. ch4t. so remove?
+      return true
     else:
-      let file = openAsync(path, fmRead)
-      var cont: string
-      try:
-        cont = await readAll(file)
-      except:
-        echo "warn could not read from file:", path
-        return
-      file.close()
-      if req.client.isClosed():
-        return true
-      await req.respond(Http200, cont, headers = headers)
-      # req.client.close() # warning, this breaks eg. ch4t. so remove?
-
-    return true
-  else:
-    return false
+      return false
